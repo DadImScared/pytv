@@ -4,7 +4,7 @@ setup(
     name='pytv',
     version='0.1.0',
     packages=['pytv'],
-    url='',
+    url='https://github.com/DadImScared/pytv',
     license='MIT',
     author='Matthew Bernheimer',
     author_email='matthewbernheimer@gmail.com',
