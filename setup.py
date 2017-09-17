@@ -2,12 +2,12 @@ from distutils.core import setup
 
 setup(
     name='pytv',
-    version='0.1.0',
+    version='0.2.0',
     packages=['pytv'],
     url='https://github.com/DadImScared/pytv',
     license='MIT',
     author='Matthew Bernheimer',
     author_email='matthewbernheimer@gmail.com',
     description='Python library to use the TV MAZE API (www.tvmaze.com)',
-    requires=['requests']
+    install_requires=['requests'],
 )

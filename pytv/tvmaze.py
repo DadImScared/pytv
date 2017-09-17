@@ -1,7 +1,7 @@
 import requests
 import time
 
-from .apiurls import SCHEDULE, SHOW, SEASON
+from .apiurls import SCHEDULE, SHOW, SEASON, EPISODE
 from .tvmaze_utility import make_request, ApiError, get_list
 
 
@@ -18,13 +18,21 @@ class Schedule:
         self.date = date or time.strftime('%Y-%m-%d')
         self.country_code = country_code
         self.url = '{}?country={}&date={}'.format(SCHEDULE, self.country_code, self.date)
+        self.episode_list = []
 
-        #: list of episodes from api call to schedule endpoint sorted by highest show weight
-        self.episodes = sorted(
-            requests.get(self.url).json(),
-            key=lambda episode: int(episode["show"]["weight"]),
-            reverse=True
-        )
+    @property
+    def episodes(self):
+        """Return list of episodes"""
+        try:
+            episode_list = get_list(self, 'episode_list', self.url, Episode)
+        except ApiError as e:
+            raise e
+        else:
+            return sorted(
+                episode_list,
+                key=lambda episode: int(episode.show.weight),
+                reverse=True
+            )
 
     def exclude_networks(self, networks=None):
         """Exclude certain networks from the schedule
@@ -34,24 +42,25 @@ class Schedule:
         """
         if not networks:
             raise ValueError("must include at least one network to exclude")
-        return [episode for episode in self.episodes if episode["show"]["network"]["name"] not in networks]
+        return [episode for episode in self.episodes if episode.show.network["name"] not in networks]
 
     def include_networks(self, networks=None):
         """Returns list of episodes from networks included"""
         if not networks:
             raise ValueError("must include at least one network to include")
-        return [episode for episode in self.episodes if episode["show"]["network"]["name"] in networks]
+        return [episode for episode in self.episodes if episode.show.network["name"] in networks]
 
 
 class Show:
     """Show class for tvmaze api"""
 
-    def __init__(self, show_id, embed_url=None, **kwargs):
+    def __init__(self, show_id=None, embed_url=None, **kwargs):
         self.cast_list = []
         self.crew_list = []
         self.season_list = []
         self.episode_list = []
         self.special_list = []
+        self.next = None
 
         if show_id:
             self.show_id = show_id
@@ -87,13 +96,13 @@ class Show:
                 if embed_url:
                     self._embedded = show["_embedded"]
                     if 'episodes' in self._embedded:
-                        self.episode_list = self._embedded["episodes"]
+                        self.episode_list = [Episode(**episode) for episode in self._embedded["episodes"]]
                     if 'cast' in self._embedded:
                         self.cast_list = self._embedded["cast"]
                     if 'crew' in self._embedded:
                         self.crew_list = self._embedded["crew"]
                     if 'seasons' in self._embedded:
-                        self.season_list = self._embedded["seasons"]
+                        self.season_list = [Season(**season) for season in self._embedded["seasons"]]
         else:
             self.show_id = kwargs.get('id')
             for key, val in kwargs.items():
@@ -109,9 +118,33 @@ class Show:
     def episodes(self):
         """Return list of episodes"""
         try:
-            return get_list(self, 'episode_list', self.episodes_url)
+            return get_list(self, 'episode_list', self.episodes_url, Episode)
         except ApiError as e:
             raise e
+
+    def get_episode(self, index):
+        """Return episode in episode_list based on index
+
+        :param int index: Index of episode list
+        :return: Episode object
+        """
+        try:
+            return self.episodes[int(index)]
+        except (ValueError, IndexError):
+            return None
+
+    @property
+    def next_episode(self):
+        """Return episode that will air next"""
+        if self.next:
+            return self.next
+        try:
+            episode_url = self._links['nextepisode']['href']
+        except KeyError:
+            return None
+        else:
+            self.next = Episode(create_url=episode_url)
+            return self.next
 
     @property
     def specials(self):
@@ -164,7 +197,7 @@ class Show:
     def cast(self):
         """Return list of cast related to the show"""
         try:
-            return get_list(self, 'cast_list', self.cast_url)
+            return get_list(self, 'cast_list', self.cast_url, Cast)
         except ApiError as e:
             raise e
 
@@ -172,7 +205,7 @@ class Show:
     def crew(self):
         """Return list of crew related to the show"""
         try:
-            return get_list(self, 'crew_list', self.crew_url)
+            return get_list(self, 'crew_list', self.crew_url, Crew)
         except ApiError as e:
             raise e
 
@@ -193,7 +226,7 @@ class Season:
                 raise ValueError('{}'.format(response.json()['message']))
             season = response.json()
             if with_episodes:
-                self.episode_list = season['_embedded']['episodes']
+                self.episode_list = [Episode(**episode) for episode in season['_embedded']['episodes']]
             self.name = season["name"]
             self._links = season["_links"]
             self.url = season["url"]
@@ -219,22 +252,56 @@ class Season:
         r = requests.get('{}/episodes'.format(self.base_url))
         if r.status_code >= 400:
             return []
-        self.episode_list = r.json()
+        self.episode_list = [Episode(**episode) for episode in r.json()]
         return self.episode_list
+
+
+class Episode:
+    """Episode class for tvmaze api"""
+    def __init__(self, create_url=None, **kwargs):
+        """Create episode with episode url or a dict of episode info"""
+        if create_url:
+            try:
+                episode = make_request(create_url)
+            except ApiError as e:
+                raise e
+            else:
+                self.airdate = episode["airdate"]
+                self.airstamp = episode["airstamp"]
+                self.number = episode["number"]
+                self.id = episode["id"]
+                self.season = episode["season"]
+                self.runtime = episode["runtime"]
+                self.name = episode["name"]
+                self.image = episode["image"]
+                self.summary = episode["summary"]
+                self.airtime = episode["airtime"]
+                self.url = episode["url"]
+                self._links = episode["_links"]
+        for key, val in kwargs.items():
+            setattr(self, key, val)
+        try:
+            self.show = Show(**kwargs['show'])
+        except KeyError:
+            self.show = None
 
 
 class Person:
     """Person class for tvmaze api"""
 
-    def __init__(self, **kwargs):
+    def __init__(self, person, **kwargs):
+        self.id = person.get('id', 1)
+        self.url = person.get('url', 'no url entered')
+        self.name = person.get('name', 'no name')
+        self.image = person.get('image', {"medium": "no link", "original": "no link"})
         for key, val in kwargs.items():
             setattr(self, key, val)
 
 
 class Crew(Person):
-    def __init__(self, crew_type, **kwargs):
+    def __init__(self, type, **kwargs):
         super().__init__(**kwargs)
-        self.crew_type = crew_type
+        self.crew_type = type
 
 
 class Cast(Person):

@@ -21,13 +21,10 @@ Usage
 
 
     Get schedule for current day::
-
-    >>>schedule = Schedule()
-    >>>schedule.episodes
-
-    [list of episodes]
+        >>>schedule = Schedule()
+        >>>schedule.episodes
+        [list of episodes]
 
     Get schedule for other days::
 
     >>>schedule = Schedule(date='2011-25-12')
-

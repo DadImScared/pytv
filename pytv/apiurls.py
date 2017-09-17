@@ -6,5 +6,6 @@ SCHEDULE = '{}schedule'.format(BASE_URL)
 FULL_SCHEDULE = '{}/full'.format(SCHEDULE)
 
 SHOW = '{}shows/'.format(BASE_URL)
+EPISODE = '{}/episodes/'.format(BASE_URL)
 
 SEASON = '{}seasons/'.format(BASE_URL)

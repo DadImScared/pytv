@@ -2,7 +2,7 @@
 
 import requests
 import time
-from pytv.tvmaze import Schedule, Show, Season, ApiError
+from pytv.tvmaze import Schedule, Show, Season, Cast, Crew, ApiError, make_request
 import unittest
 
 
@@ -27,28 +27,22 @@ class TestSchedule(unittest.TestCase):
 
         # test api returns 200
         self.assertEqual(200, response.status_code)
-        shows = self.schedule.episodes
+        episodes = self.schedule.episodes
 
-        self.assertTrue(shows)
-
-        # the following tests various things expected in a tvmaze object
-
-        for show in shows:
-            self.assertTrue('tvmaze' in show['url'])
-            self.assertTrue(all(k in show['show']['schedule'] for k in ['time', 'days']))
+        self.assertTrue(episodes)
 
     def test_include_networks(self):
         """include_networks() should return all episodes in the included networks"""
         new_episodes = self.schedule.include_networks(['Disney Channel'])
         for episode in new_episodes:
-            self.assertTrue(episode["show"]["network"]["name"] in ['Disney Channel'])
+            self.assertTrue(episode.show.network["name"] in ['Disney Channel'])
 
     def test_include_multiple_networks(self):
         """include_networks() should return all episodes with multiple networks included"""
         networks = ['Disney Channel', 'HGTV', 'CBS']
         new_episodes = self.schedule.include_networks(networks)
         for episode in new_episodes:
-            self.assertTrue(episode["show"]["network"]["name"] in networks)
+            self.assertTrue(episode.show.network["name"] in networks)
 
 
 class TestShow(unittest.TestCase):
@@ -64,17 +58,24 @@ class TestShow(unittest.TestCase):
         """init method of show class should raise error if show id is not valid"""
         self.assertRaises(ApiError, lambda: Show(show_id='3fad'))
 
-    def test_create_show_with_embed_url(self):
+    def test_create_show_with_embed_cast_url(self):
         """Tests init method in show class with additional arg embed_url"""
         show = Show(show_id=1, embed_url='?embed=cast')
         self.assertEqual('http://api.tvmaze.com/shows/1?embed=cast', show.api_url)
+
+    def test_create_show_with_embed_season_url(self):
+        """Init method in show class when embed_url=seasons should return all seasons as Season class per season"""
+        show = Show(show_id=1, embed_url='?embed=seasons')
+        self.assertIsInstance(show.seasons[0], Season)
+        self.assertTrue(show.seasons[0].episodes)
+        self.assertEqual(1, show.seasons[0].number)
 
     def test_episodes(self):
         """episodes property should return a list of episodes"""
         show = Show(show_id=1)
         episodes = show.episodes
         for episode in episodes:
-            self.assertTrue('under-the-dome' in episode['url'])
+            self.assertTrue('under-the-dome' in episode.url)
 
     def test_seasons(self):
         """seasons property should return list of seasons"""
@@ -133,10 +134,8 @@ class TestShow(unittest.TestCase):
         self.assertTrue(cast_list)
 
         for cast in cast_list:
-            self.assertTrue('character' in cast)
-
-        for cast in show.cast_list:
-            self.assertTrue('character' in cast)
+            self.assertTrue(hasattr(cast, 'character'))
+            self.assertTrue(cast, Cast)
 
     def test_crew(self):
         """crew property should return list of crew members"""
@@ -147,7 +146,29 @@ class TestShow(unittest.TestCase):
         self.assertTrue(show.crew_list)
         self.assertTrue(crew)
         for person in crew:
-            self.assertTrue('type' in person)
+            self.assertTrue(hasattr(person, 'crew_type'))
+            self.assertIsInstance(person, Crew)
+
+    def test_get_episode_method_with_valid_int(self):
+        """get_episode(-1) should return the last Episode object in the episode list"""
+        show = Show(show_id=1)
+        self.assertEqual(show.episodes[-1], show.get_episode(-1))
+
+    def test_get_episode_method_with_bad_input(self):
+        """get_episode("taco") should return None"""
+        show = Show(show_id=1)
+        self.assertIsNone(show.get_episode('taco'))
+
+    def test_get_episode_method_with_out_of_range_input(self):
+        """get_episode(100000) should return None assuming a show doesn't have 100,000 episodes"""
+        show = Show(show_id=1)
+        self.assertIsNone(show.get_episode(100000))
+
+    def test_next_episode(self):
+        """next_episode property should return Episode object or None"""
+        schedule = Schedule()
+        show = schedule.episodes[0].show
+        self.assertTrue(show.next_episode)
 
 
 class TestSeason(unittest.TestCase):
@@ -166,17 +187,7 @@ class TestSeason(unittest.TestCase):
         """Tests init method in Season class with_episodes=True"""
         season = Season(season_id=1, with_episodes=True)
         for episode in season.episodes:
-            self.assertEqual(1, episode['season'])
-
-    def test_season_from_kwargs(self):
-        """Tests init method from Season class with kwargs instead of season_id"""
-        show = Show(show_id=1, embed_url='?embed=seasons')
-        season = Season(**show.seasons[0])
-        third_season = Season(**show.seasons[-1])
-        self.assertTrue('season-1' in season.url)
-        self.assertEqual(3, third_season.number)
-        self.assertTrue('season-3' in third_season.url)
-        self.assertTrue(third_season.episodes)
+            self.assertEqual(1, episode.season)
 
     def test_episodes(self):
         """Test episodes property"""
@@ -190,3 +201,39 @@ class TestSeason(unittest.TestCase):
 
         # make sure episode_list is correctly populated after api call
         self.assertTrue(season.episode_list)
+
+
+class TestCast(unittest.TestCase):
+    """Tests for Cast class in tvmaze.py"""
+
+    def setUp(self):
+        self.cast_list = make_request('http://api.tvmaze.com/shows/1/cast')
+
+    def test_create_cast_class(self):
+        """Tests init method of cast class"""
+        cast_member = Cast(**self.cast_list[0])
+        self.assertTrue(cast_member.character)
+        self.assertTrue(cast_member.name)
+        self.assertTrue(cast_member.url)
+        self.assertTrue(cast_member.image)
+        self.assertNotEqual('no name', cast_member.name)
+        self.assertNotEqual('no url entered', cast_member.url)
+        self.assertNotEqual({"medium": "no link", "original": "no link"}, cast_member.image)
+
+
+class TestCrew(unittest.TestCase):
+    """Tests for Crew class in tvmaze.py"""
+
+    def setUp(self):
+        self.crew_list = make_request('http://api.tvmaze.com/shows/1/crew')
+
+    def test_create_crew_class(self):
+        """Tests init method of crew class"""
+        crew_member = Crew(**self.crew_list[0])
+        self.assertTrue(crew_member.crew_type)
+        self.assertTrue(crew_member.name)
+        self.assertTrue(crew_member.url)
+        self.assertTrue(crew_member.image)
+        self.assertNotEqual('no name', crew_member.name)
+        self.assertNotEqual('no url entered', crew_member.url)
+        self.assertNotEqual({"medium": "no link", "original": "no link"}, crew_member.image)
