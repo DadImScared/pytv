@@ -98,9 +98,9 @@ class Show:
                     if 'episodes' in self._embedded:
                         self.episode_list = [Episode(**episode) for episode in self._embedded["episodes"]]
                     if 'cast' in self._embedded:
-                        self.cast_list = self._embedded["cast"]
+                        self.cast_list = [Cast(**cast) for cast in self._embedded["cast"]]
                     if 'crew' in self._embedded:
-                        self.crew_list = self._embedded["crew"]
+                        self.crew_list = [Crew(**crew) for crew in self._embedded["crew"]]
                     if 'seasons' in self._embedded:
                         self.season_list = [Season(**season) for season in self._embedded["seasons"]]
         else:
@@ -113,6 +113,9 @@ class Show:
         self.cast_url = '{}/cast'.format(self.base_url)
         self.episodes_url = '{}/episodes'.format(self.base_url)
         self.season_url = '{}/seasons'.format(self.base_url)
+
+    def __str__(self):
+        return "{}".format(self.name)
 
     @property
     def episodes(self):
@@ -152,8 +155,8 @@ class Show:
         try:
             return [
                 episode for episode in
-                get_list(self, 'special_list', '{}?specials=1'.format(self.episodes_url))
-                if not episode['number']
+                get_list(self, 'special_list', '{}?specials=1'.format(self.episodes_url), Episode)
+                if not episode.number
             ]
         except ApiError as e:
             raise e
@@ -296,6 +299,9 @@ class Person:
         self.image = person.get('image', {"medium": "no link", "original": "no link"})
         for key, val in kwargs.items():
             setattr(self, key, val)
+
+    def __str__(self):
+        return self.name
 
 
 class Crew(Person):

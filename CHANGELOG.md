@@ -1,12 +1,17 @@
 
 # Pytv ChangeLog
-____
-
-
-## v0.2.0 (2017-09-16)
 ___
 
-## New Classes:
+## v0.2.1 (2017-10-03)
+
+#### Fixed:
+
+* Show.cast properly returns list of cast members as Cast objects when initialized Show with embed_url with cast
+* Show.crew properly returns list oc crew members as Crew objects when initialized Show with embed_url with crew
+
+## v0.2.0 (2017-09-16)
+
+### New Classes:
 
 * Episode
 * Cast

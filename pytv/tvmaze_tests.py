@@ -2,7 +2,7 @@
 
 import requests
 import time
-from pytv.tvmaze import Schedule, Show, Season, Cast, Crew, ApiError, make_request
+from pytv.tvmaze import Schedule, Show, Season, Cast, Crew, Episode, ApiError, make_request
 import unittest
 
 
@@ -88,9 +88,12 @@ class TestShow(unittest.TestCase):
             self.assertIsInstance(season, Season)
 
     def test_specials(self):
+        """specials property should return list of specials as Episode objects"""
         show = Show(show_id=1)
         specials = show.specials
         self.assertTrue(specials)
+        for episode in specials:
+            self.assertIsInstance(episode, Episode)
 
     def test_failed_episode_by_season_and_number(self):
         """episode_by_number() should raise ValueError if bad season or episode"""
@@ -124,8 +127,8 @@ class TestShow(unittest.TestCase):
         for episode in episodes:
             self.assertEqual('2013-07-01', episode['airdate'])
 
-    def test_get_cast(self):
-        """get_cast() should return a list of cast members"""
+    def test_cast(self):
+        """cast property should return a list of cast members"""
         show = Show(show_id=1)
         self.assertTrue('/1/cast' in show.cast_url)
         self.assertFalse(show.cast_list)
@@ -135,7 +138,13 @@ class TestShow(unittest.TestCase):
 
         for cast in cast_list:
             self.assertTrue(hasattr(cast, 'character'))
-            self.assertTrue(cast, Cast)
+            self.assertIsInstance(obj=cast, cls=Cast)
+
+    def test_cast_with_embed_url(self):
+        """cast property should return list of cast members as Cast objects when created with embed_url"""
+        show = Show(show_id=1, embed_url="?embed=cast")
+        for cast in show.cast:
+            self.assertIsInstance(cast, Cast)
 
     def test_crew(self):
         """crew property should return list of crew members"""
@@ -148,6 +157,12 @@ class TestShow(unittest.TestCase):
         for person in crew:
             self.assertTrue(hasattr(person, 'crew_type'))
             self.assertIsInstance(person, Crew)
+
+    def test_crew_with_embed_url(self):
+        """crew property should return list of crew members as Crew objects when created with embed_url"""
+        show = Show(show_id=1, embed_url='?embed=crew')
+        for crew in show.crew:
+            self.assertIsInstance(crew, Crew)
 
     def test_get_episode_method_with_valid_int(self):
         """get_episode(-1) should return the last Episode object in the episode list"""

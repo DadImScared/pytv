@@ -21,12 +21,29 @@ Usage
 
 
     Get schedule for current day::
+
         >>>schedule = Schedule()
-
         >>>schedule.episodes
-
         [list of episodes]
 
     Get schedule for other days::
 
-    >>>schedule = Schedule(date='2011-25-12')
+        >>>schedule = Schedule(date='2011-25-12')
+
+    Get a show::
+
+        >>>show = Show(show_id=1)
+        >>>show.name
+        'Under The Dome'
+
+The Show class has the following attributes:
+
+- episodes
+- specials
+- seasons
+- cast
+- crew
+- next_episode
+- summary
+- name
+- premiered
