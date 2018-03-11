@@ -2,7 +2,21 @@
 
 import requests
 import time
-from pytv.tvmaze import Schedule, Show, Season, Cast, Crew, Episode, ApiError, make_request
+from pytv.tvmaze import (
+    Schedule,
+    Shows,
+    Show,
+    Search,
+    Season,
+    Cast,
+    Crew,
+    Person,
+    Episode,
+    ApiError,
+    make_request,
+    get_updates
+)
+from .apiurls import SHOW, SHOWS
 import unittest
 
 
@@ -45,6 +59,78 @@ class TestSchedule(unittest.TestCase):
             self.assertTrue(episode.show.network["name"] in networks)
 
 
+class TestShows(unittest.TestCase):
+
+    def get_compare_data(self, page=0):
+        return [Show(**show) for show in make_request('{}?page={}'.format(SHOWS, page))]
+
+    def compare_api_and_class(self, show_class):
+        shows_data = self.get_compare_data(show_class.page)
+        for show1, show2 in zip(show_class.shows, shows_data):
+            self.assertEqual(show1.id, show2.id)
+            self.assertEqual(show1.name, show2.name)
+
+    def test_shows(self):
+        shows = Shows()
+        self.compare_api_and_class(shows)
+
+    def test_shows_with_page(self):
+        shows = Shows(page=3)
+        self.assertEqual(shows.page, 3)
+        self.compare_api_and_class(shows)
+
+    def test_shows_next_page(self):
+        shows = Shows(page=6)
+        shows.next_page()
+        self.assertEqual(shows.page, 7)
+        self.compare_api_and_class(shows)
+
+    def test_shows_previous_page(self):
+        shows = Shows(page=5)
+        shows.previous_page()
+        self.assertEqual(shows.page, 4)
+        self.compare_api_and_class(shows)
+
+    def test_repeat_pagination_calls(self):
+        shows = Shows(page=3)
+        shows.next_page()
+        shows.next_page()
+        self.assertEqual(shows.page, 5)
+        self.compare_api_and_class(shows)
+        shows.next_page()
+        shows.next_page()
+        self.assertEqual(shows.page, 7)
+        self.compare_api_and_class(shows)
+        shows.previous_page()
+        self.assertEqual(shows.page, 6)
+        self.compare_api_and_class(shows)
+        shows.previous_page()
+        shows.previous_page()
+        self.assertEqual(shows.page, 4)
+        self.compare_api_and_class(shows)
+        shows.previous_page()
+        self.assertEqual(shows.page, 3)
+        self.compare_api_and_class(shows)
+
+    def test_out_of_range_page(self):
+        """A page below 0 should return page 0 a page above max pages should raise error"""
+        shows = Shows(page=-1)
+        self.assertEqual(0, shows.page)
+        self.compare_api_and_class(shows)
+
+        self.assertRaises(ApiError, lambda: Shows(page=1000))
+
+        shows = Shows(page=141)
+        self.assertRaises(ApiError, lambda: shows.next_page())
+        self.assertEqual(shows.page, 141)
+
+    def test_updates(self):
+        data = get_updates()
+        self.assertTrue(data)
+        for key in data.keys():
+            self.assertTrue(int(key))
+
+
 class TestShow(unittest.TestCase):
     """Tests Show class in tvmaze.py"""
 
@@ -57,6 +143,15 @@ class TestShow(unittest.TestCase):
     def test_bad_create_show(self):
         """init method of show class should raise error if show id is not valid"""
         self.assertRaises(ApiError, lambda: Show(show_id='3fad'))
+
+    def test_create_show_from_api_data(self):
+        data = make_request('{}1'.format(SHOW))
+        show = Show(**data)
+        self.assertEqual(data['id'], show.id)
+        self.assertEqual(data['id'], show.show_id)
+        self.assertDictEqual(data['schedule'], show.schedule)
+        self.assertDictEqual(data['network'], show.network)
+        self.assertListEqual(data['genres'], show.genres)
 
     def test_create_show_with_embed_cast_url(self):
         """Tests init method in show class with additional arg embed_url"""
@@ -252,3 +347,37 @@ class TestCrew(unittest.TestCase):
         self.assertNotEqual('no name', crew_member.name)
         self.assertNotEqual('no url entered', crew_member.url)
         self.assertNotEqual({"medium": "no link", "original": "no link"}, crew_member.image)
+
+
+class TestSearch(unittest.TestCase):
+
+    def test_search_shows(self):
+        search = Search(query='under the dome')
+        self.assertTrue(search.results)
+        self.assertEqual(search.results[0].name, Show(show_id=1).name)
+        for result in search.results:
+            self.assertIsInstance(result, Show)
+
+    def test_search_single_search(self):
+        """single search only returns a single result instead of a list"""
+        search = Search(variant='singlesearch', query='under the doem')
+        self.assertTrue(search.results)
+        self.assertEqual(search.results.name, Show(show_id=1).name)
+        self.assertIsInstance(search.results, Show)
+
+    def test_search_lookup(self):
+        """look up search only returns single result"""
+        search = Search(variant='lookup', lookup='thetvdb=81189')
+        # look up search is of breaking bad we will get breaking bad by name and compare with thetvdb lookup
+        second_search = Search(variant='singlesearch', query='breaking bad')
+        self.assertTrue(search.results)
+        self.assertEqual(search.results.name, second_search.results.name)
+        self.assertIsInstance(search.results, Show)
+
+    def test_search_people(self):
+        search = Search(variant='people', query='lauren')
+        api_results = [Person(**item) for item in make_request(search.url)]
+        for person1, person2 in zip(search.results, api_results):
+            self.assertEqual(person1.name, person2.name)
+            self.assertEqual(person1.id, person2.id)
+            self.assertIsInstance(person1, Person)

@@ -2,7 +2,7 @@ from distutils.core import setup
 
 setup(
     name='pytv',
-    version='0.2.1',
+    version='0.3.0',
     packages=['pytv'],
     url='https://github.com/DadImScared/pytv',
     license='MIT',

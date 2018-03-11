@@ -47,3 +47,39 @@ The Show class has the following attributes:
 - summary
 - name
 - premiered
+
+Search class:
+
+    init: variant, query, lookup
+
+    query: required if variant is in [show, singlesearch, people]
+
+    lookup: required if variant is lookup
+
+    variant options:
+
+    - show(default)
+    - singlesearch
+    - lookup
+    - people
+
+    attributes:
+
+    - results (list if variant in [show, people] single object if other)
+
+Search usage
+
+  from pytv import Search
+
+  search shows::
+
+    >>>search = Search(query='breaking bad')
+    >>>search.results
+    [list of results as Show objects]
+
+  lookup tvdb id::
+
+    >>>search = Search(variant="lookup", lookup="thetvdb=81189")
+    >>>search.results
+    (Show object)
+

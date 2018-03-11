@@ -2,6 +2,16 @@
 # Pytv ChangeLog
 ___
 
+## v0.3.0 (2018-03-10)
+
+#### Fixed:
+* proper error on 404
+
+### Added:
+* Search class
+* Shows class
+* get_updates
+
 ## v0.2.1 (2017-10-03)
 
 #### Fixed:

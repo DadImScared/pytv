@@ -19,7 +19,7 @@ def make_request(url):
     r = requests.get(url)
     data = r.json()
     if r.status_code > 400:
-        raise ApiError({"message": data['message'], "statusCode": r.status_code})
+        raise ApiError({"message": data['message'] if 'message' in data else 'Not found', "statusCode": r.status_code})
     return data
 
 

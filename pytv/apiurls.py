@@ -5,7 +5,15 @@ BASE_URL = 'http://api.tvmaze.com/'
 SCHEDULE = '{}schedule'.format(BASE_URL)
 FULL_SCHEDULE = '{}/full'.format(SCHEDULE)
 
-SHOW = '{}shows/'.format(BASE_URL)
+UPDATES = '{}updates/shows'.format(BASE_URL)
+SHOWS = '{}shows'.format(BASE_URL)
+SHOW = '{}/'.format(SHOWS)
 EPISODE = '{}/episodes/'.format(BASE_URL)
 
 SEASON = '{}seasons/'.format(BASE_URL)
+
+SEARCH = '{}search/'.format(BASE_URL)
+SINGLE_SEARCH = '{}/singlesearch/shows/'.format(BASE_URL)
+SHOW_LOOKUP = '{}/lookup/shows'.format(BASE_URL)
+SHOW_SEARCH = '{}shows'.format(SEARCH)
+PEOPLE_SEARCH = '{}people'.format(SEARCH)

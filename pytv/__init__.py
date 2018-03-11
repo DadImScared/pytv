@@ -1,1 +1,1 @@
-from .tvmaze import Schedule, Show
+from .tvmaze import Schedule, Show, Shows, Search

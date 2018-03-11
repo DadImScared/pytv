@@ -1,8 +1,23 @@
 import requests
 import time
 
-from .apiurls import SCHEDULE, SHOW, SEASON, EPISODE
+from .apiurls import (
+    SCHEDULE,
+    SHOW,
+    SEASON,
+    EPISODE,
+    SHOWS,
+    UPDATES,
+    PEOPLE_SEARCH,
+    SINGLE_SEARCH,
+    SHOW_SEARCH,
+    SHOW_LOOKUP
+)
 from .tvmaze_utility import make_request, ApiError, get_list
+
+
+def get_updates():
+    return make_request(UPDATES)
 
 
 class Schedule:
@@ -49,6 +64,38 @@ class Schedule:
         if not networks:
             raise ValueError("must include at least one network to include")
         return [episode for episode in self.episodes if episode.show.network["name"] in networks]
+
+
+class Shows:
+    def __init__(self, page=0):
+        if page < 0:
+            page = 0
+        url = self.get_url(page)
+        self.shows = [Show(**show) for show in make_request(url)]
+        self.page = page
+
+    def get_url(self, page=0):
+        return SHOWS if not page else '{}?page={}'.format(SHOWS, page)
+
+    def change_page(self, change):
+        if self.page == change:
+            return self.shows
+        new_page = self.page + change
+        try:
+            self.shows = [Show(**show) for show in make_request(self.get_url(new_page))]
+            self.page = new_page
+        except ApiError as e:
+            raise e
+        else:
+            return self.shows
+
+    def next_page(self):
+        self.change_page(1)
+        if not self.shows:
+            raise ValueError('No more shows')
+
+    def previous_page(self):
+        self.change_page(-1)
 
 
 class Show:
@@ -314,3 +361,52 @@ class Cast(Person):
     def __init__(self, character, **kwargs):
         super().__init__(**kwargs)
         self.character = character
+
+
+class Search:
+    def __init__(self, query=None, variant='shows', **kwargs):
+        """
+
+        variant options:
+
+        - shows(default)
+        - singlesearch
+        - lookup
+        - people
+
+        :param str variant: One of the api search options on tv maze.
+        :param str query: Search query.
+        """
+        self.variant = variant
+        self.results_list = None
+        self.kls = Show
+        if variant == 'shows':
+            self.url = '{}?q={}'.format(SHOW_SEARCH, query)
+        elif variant == 'singlesearch':
+            url = '{}?q={}'.format(SINGLE_SEARCH, query)
+            embed_string = kwargs.get('embed_string')
+            url += '&{}'.format(embed_string)
+            self.url = url
+        elif variant == 'lookup':
+            lookup = kwargs.get('lookup')
+            if not lookup:
+                raise ValueError("""
+                lookup string i.e tvrage=1242 required when search is variant lookup.
+                See documentation for other lookup strings
+                """)
+            self.url = '{}?{}'.format(SHOW_LOOKUP, lookup)
+        elif variant == 'people':
+            self.url = '{}?q={}'.format(PEOPLE_SEARCH, query)
+            self.kls = Person
+
+    @property
+    def results(self):
+        if self.results_list:
+            return self.results_list
+        if self.variant == 'singlesearch' or self.variant == 'lookup':
+            self.results_list = self.kls(**make_request(self.url))
+        elif self.variant == 'people':
+            self.results_list = [self.kls(**item) for item in make_request(self.url)]
+        else:
+            self.results_list = [self.kls(**item['show']) for item in make_request(self.url)]
+        return self.results_list
